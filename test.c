@@ -1,19 +1,14 @@
 #include <stdio.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
+#include <string.h>
 
 int main() {
-    int shmid = 32769;  // Replace with your SHMID
-    struct shmid_ds shm_info;
+    char str[] = "apple|banana|cherry|date";
+    char *token = strtok(str, "|");
 
-    if (shmctl(shmid, IPC_STAT, &shm_info) == -1) {
-        perror("shmctl");
-        return 1;
+    while (token != NULL) {
+        printf("Token: %s\n", token);
+        token = strtok(NULL, "|");
     }
-
-    printf("Creator PID (cpid): %d\n", shm_info.shm_cpid);
-    printf("Last PID (lpid): %d\n", shm_info.shm_lpid);
-    printf("Current attached processes: %ld\n", shm_info.shm_nattch);
 
     return 0;
 }

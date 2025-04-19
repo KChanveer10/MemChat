@@ -7,17 +7,18 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 
-#define SIZ 1024
+#define SIZE 1024
 
 struct shmseg
 {
-    char usernames[SIZ];
-    char messgaes[SIZ];
+    char usernames[SIZE];
+    char messgaes[SIZE];
+    char timestamp[SIZE];
     bool flag;
     int numPro;
 };
-
 
 void handle_signal(){
     int key = 5678;
@@ -87,8 +88,19 @@ void main()
     If flag is false and numofusers (clients) are zero then shm seg should be removed
     */
 
-    strcpy(shm->usernames, " ");
-    strcpy(shm->messgaes, " ");
+    memset(shm->messgaes,0,strlen(shm->messgaes));
+    memset(shm->usernames,0,strlen(shm->usernames));
+    memset(shm->timestamp,0,strlen(shm->timestamp));
+    if (shm->usernames[0] == '\0') {  // If not initialized, do it
+        shm->usernames[0] = '\0';
+    }
+    if (shm->messgaes[0] == '\0') {  // If not initialized, do it
+        shm->messgaes[0] = '\0';
+    }
+    if (shm->timestamp[0] == '\0') {  // If not initialized, do it
+        shm->timestamp[0] = '\0';
+    }
+
     shm->flag=true;
 
 
@@ -101,6 +113,7 @@ void main()
         sleep(3);
         printf("Username := %s\n",shm->usernames);
         printf("Messages := %s\n",shm->messgaes);
+        printf("Timestamp := %s\n",shm->timestamp);
 
         // printf("Current mode: %o\n", shm_info.shm_perm.mode);
 
