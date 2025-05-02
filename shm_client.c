@@ -1,7 +1,3 @@
-/*
- * shm-client - client program to demonstrate shared memory.
- */
-
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -11,8 +7,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
+#include <pthread.h>
 
 #define SIZE 1024
+// Shared variables
+pthread_mutex_t cond_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int ready_to_read = 0;
+char myUser[100];
 
 struct shmseg
 {
@@ -20,17 +22,17 @@ struct shmseg
     char messages[SIZE];
     char timestamp[SIZE];
     bool flag;
+    bool readFlag;
     int numPro;
+    int counter;
 };
 
 char *getTimeInSecondsStr()
 {
     time_t now = time(NULL);
     struct tm *local = localtime(&now);
-
     int seconds = local->tm_hour * 3600 + local->tm_min * 60 + local->tm_sec;
 
-    // Allocate memory for the string (enough for up to 5-6 digit seconds + null terminator)
     char *buffer = malloc(16);
     if (buffer == NULL)
         return NULL;
@@ -39,18 +41,20 @@ char *getTimeInSecondsStr()
     return buffer;
 }
 
-void split(char *str, const char *delim, char *parts[], int *count) {
+void split(char *str, const char *delim, char *parts[], int *count)
+{
     char *token = strtok(str, delim);
     *count = 0;
-    while (token != NULL && *count < SIZE) {
+    while (token != NULL && *count < SIZE)
+    {
         parts[(*count)++] = token;
         token = strtok(NULL, delim);
     }
 }
 
-
-void DispStatus(struct shmseg *shmg){
-    printf("--------------\n");
+void DispStatus(struct shmseg *shmg)
+{
+    printf("\n--------------\n");
     char user[SIZE];
     char messages[SIZE];
 
@@ -69,17 +73,39 @@ void DispStatus(struct shmseg *shmg){
 
     int count = (user_count < msg_count) ? user_count : msg_count;
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         printf("%s > %s\n", users[i], mesg[i]);
     }
     printf("------------------\n");
 }
 
+void *reader_thread(void *arg)
+{
+    struct shmseg *shm = (struct shmseg *)arg;
 
+    pthread_mutex_lock(&cond_mutex);
 
+    while (!ready_to_read)
+    {
+        pthread_cond_wait(&cond, &cond_mutex);
+    }
 
+    ready_to_read = 0;
+    pthread_mutex_unlock(&cond_mutex);
 
-
+    while (1)
+    {
+        if (shm->readFlag)
+        {
+            DispStatus(shm);
+            printf("%s >>> ", myUser);
+            fflush(stdout);
+            shm->readFlag = false;
+        }
+    }
+    return NULL;
+}
 
 void main()
 {
@@ -87,25 +113,14 @@ void main()
     key_t key;
     char input[100];
     char messages[100];
-    char myUser[100];
     struct shmseg *shm;
     struct shmid_ds shm_info;
-    int seconds;
-
-    /*
-     * We need to get the segment named
-     * "5678", created by the server.
-     */
 
     key = 5678;
 
-    /*
-     * Locate the segment.
-     */
-
     if ((shmid = shmget(key, sizeof(struct shmseg), 0666)) < 0)
     {
-        perror("shmget");
+        printf("Server is not up yet! Sorry :(\n");
         exit(1);
     }
 
@@ -121,42 +136,39 @@ void main()
         exit(1);
     }
 
-    /*
-     * Now we attach the segment to our data space.
-     */
+    pthread_t tid;
+    pthread_create(&tid, NULL, reader_thread, (void *)shm);
 
-    printf("Enter the UserName: ");
-    fgets(input, sizeof input, stdin);  // <-- Crisis averted!
-    input[strcspn(input, "\n")] = '\0'; // <-- Necessary step.
+    printf("Enter the UserName and Msg: ");
+    fgets(input, sizeof input, stdin);
+    input[strcspn(input, "\n")] = '\0';
     strncpy(myUser, input, sizeof(input) - 1);
     strncat(input, "|", sizeof(input) - strlen(input) - 1);
 
     shm->numPro = shm_info.shm_nattch;
-
+    printf(">>> ");
     while (1)
     {
-        // printf("creator of shm:- %d\n",shm_info.shm_cpid);
-        // printf("last attached to shm:- %d\n",shm_info.shm_lpid);
-        // printf("Current mode: %o\n", shm_info.shm_perm.mode);
-        // printf("number of process attached:- %ld\n",shm_info.shm_nattch);
-        // fflush(stdout);
-        printf("%s >>> ", myUser);
+        pthread_mutex_lock(&cond_mutex);
+        ready_to_read = 1;
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&cond_mutex);
+
         if (fgets(messages, sizeof(messages), stdin) == NULL)
         {
-            // Handle error or EOF
             break;
         }
-        messages[strcspn(messages, "\n")] = '\0'; // Remove newline
+        messages[strcspn(messages, "\n")] = '\0';
         strncat(messages, "|", sizeof(messages) - strlen(messages) - 1);
 
-        // Check if the user wants to quit
         if (strcmp(messages, "q|") == 0)
         {
             strncat(shm->usernames, input, sizeof(shm->usernames) - strlen(shm->usernames) - 1);
             strncat(shm->messages, "Bye|", sizeof(shm->messages) - strlen(shm->messages) - 1);
             char *timeStr = getTimeInSecondsStr();
             strncat(shm->timestamp, timeStr, sizeof(shm->timestamp) - strlen(shm->timestamp) - 1);
-            DispStatus(shm);
+            free(timeStr);
+            shm->counter++;
             shm->numPro--;
             shm->flag = false;
             if (shmdt(shm) == -1)
@@ -167,12 +179,13 @@ void main()
             break;
         }
 
-        // Append the message to shared memory
         strncat(shm->usernames, input, sizeof(shm->usernames) - strlen(shm->usernames) - 1);
         strncat(shm->messages, messages, sizeof(shm->messages) - strlen(shm->messages) - 1);
         char *timeStr = getTimeInSecondsStr();
         strncat(shm->timestamp, timeStr, sizeof(shm->timestamp) - strlen(shm->timestamp) - 1);
-        DispStatus(shm);
+        free(timeStr);
+        shm->counter++;
+        sleep(2);
     }
     exit(0);
 }

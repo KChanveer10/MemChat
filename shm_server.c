@@ -8,16 +8,18 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 
 #define SIZE 1024
 
-struct shmseg
-{
+struct shmseg {
     char usernames[SIZE];
-    char messgaes[SIZE];
+    char messages[SIZE];
     char timestamp[SIZE];
     bool flag;
+    bool readFlag;
     int numPro;
+    int counter;
 };
 
 void handle_signal(){
@@ -46,6 +48,7 @@ void main()
     key_t key;
     struct shmseg *shm;
     struct shmid_ds shm_info;
+    int servcnt;
 
     /*
      * We'll name our shared memory segment
@@ -88,32 +91,46 @@ void main()
     If flag is false and numofusers (clients) are zero then shm seg should be removed
     */
 
-    memset(shm->messgaes,0,strlen(shm->messgaes));
+    memset(shm->messages,0,strlen(shm->messages));
     memset(shm->usernames,0,strlen(shm->usernames));
     memset(shm->timestamp,0,strlen(shm->timestamp));
+
     if (shm->usernames[0] == '\0') {  // If not initialized, do it
         shm->usernames[0] = '\0';
     }
-    if (shm->messgaes[0] == '\0') {  // If not initialized, do it
-        shm->messgaes[0] = '\0';
+    if (shm->messages[0] == '\0') {  // If not initialized, do it
+        shm->messages[0] = '\0';
     }
     if (shm->timestamp[0] == '\0') {  // If not initialized, do it
         shm->timestamp[0] = '\0';
     }
 
     shm->flag=true;
+    shm->flag=false;
+    shm->counter=0;
+    servcnt=0;
+
 
 
     printf("server is up\n");
     
-    
-    
+        
     while (1)
     {
-        sleep(3);
+        sleep(2);
+        printf("servcounter := %d\n",servcnt);
+        printf("counter := %d\n",shm->counter);
+
+        if(servcnt!=shm->counter){
+            shm->readFlag=true;
+        }
+        servcnt=shm->counter;
+
         printf("Username := %s\n",shm->usernames);
-        printf("Messages := %s\n",shm->messgaes);
+        printf("Messages := %s\n",shm->messages);
         printf("Timestamp := %s\n",shm->timestamp);
+        printf("ReadFlag := %d\n",shm->readFlag);
+
 
         // printf("Current mode: %o\n", shm_info.shm_perm.mode);
 
