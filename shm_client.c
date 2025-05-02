@@ -20,26 +20,11 @@ struct shmseg
 {
     char usernames[SIZE];
     char messages[SIZE];
-    char timestamp[SIZE];
     bool flag;
     bool readFlag;
     int numPro;
     int counter;
 };
-
-char *getTimeInSecondsStr()
-{
-    time_t now = time(NULL);
-    struct tm *local = localtime(&now);
-    int seconds = local->tm_hour * 3600 + local->tm_min * 60 + local->tm_sec;
-
-    char *buffer = malloc(16);
-    if (buffer == NULL)
-        return NULL;
-
-    sprintf(buffer, "%d|", seconds);
-    return buffer;
-}
 
 void split(char *str, const char *delim, char *parts[], int *count)
 {
@@ -165,9 +150,6 @@ void main()
         {
             strncat(shm->usernames, input, sizeof(shm->usernames) - strlen(shm->usernames) - 1);
             strncat(shm->messages, "Bye|", sizeof(shm->messages) - strlen(shm->messages) - 1);
-            char *timeStr = getTimeInSecondsStr();
-            strncat(shm->timestamp, timeStr, sizeof(shm->timestamp) - strlen(shm->timestamp) - 1);
-            free(timeStr);
             shm->counter++;
             shm->numPro--;
             shm->flag = false;
@@ -181,9 +163,6 @@ void main()
 
         strncat(shm->usernames, input, sizeof(shm->usernames) - strlen(shm->usernames) - 1);
         strncat(shm->messages, messages, sizeof(shm->messages) - strlen(shm->messages) - 1);
-        char *timeStr = getTimeInSecondsStr();
-        strncat(shm->timestamp, timeStr, sizeof(shm->timestamp) - strlen(shm->timestamp) - 1);
-        free(timeStr);
         shm->counter++;
         sleep(2);
     }

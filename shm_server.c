@@ -15,7 +15,6 @@
 struct shmseg {
     char usernames[SIZE];
     char messages[SIZE];
-    char timestamp[SIZE];
     bool flag;
     bool readFlag;
     int numPro;
@@ -93,16 +92,12 @@ void main()
 
     memset(shm->messages,0,strlen(shm->messages));
     memset(shm->usernames,0,strlen(shm->usernames));
-    memset(shm->timestamp,0,strlen(shm->timestamp));
-
+ 
     if (shm->usernames[0] == '\0') {  // If not initialized, do it
         shm->usernames[0] = '\0';
     }
     if (shm->messages[0] == '\0') {  // If not initialized, do it
         shm->messages[0] = '\0';
-    }
-    if (shm->timestamp[0] == '\0') {  // If not initialized, do it
-        shm->timestamp[0] = '\0';
     }
 
     shm->flag=true;
@@ -110,16 +105,12 @@ void main()
     shm->counter=0;
     servcnt=0;
 
-
-
     printf("server is up\n");
     
         
     while (1)
     {
         sleep(2);
-        printf("servcounter := %d\n",servcnt);
-        printf("counter := %d\n",shm->counter);
 
         if(servcnt!=shm->counter){
             shm->readFlag=true;
@@ -128,14 +119,6 @@ void main()
 
         printf("Username := %s\n",shm->usernames);
         printf("Messages := %s\n",shm->messages);
-        printf("Timestamp := %s\n",shm->timestamp);
-        printf("ReadFlag := %d\n",shm->readFlag);
-
-
-        // printf("Current mode: %o\n", shm_info.shm_perm.mode);
-
-        // printf("creator of shm:- %d\n",shm_info.shm_cpid);
-        // printf("last attached to shm:- %d\n",shm_info.shm_lpid);
         
         if (shm->flag==false && shm->numPro==1 )
         {
